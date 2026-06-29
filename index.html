@@ -1,0 +1,192 @@
+%%writefile templates/index.html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Airbnb Price Predictor</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f4f4f4;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #fff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+        input[type="text"],
+        input[type="number"],
+        select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+            font-size: 16px;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 18px;
+            width: 100%;
+            transition: background-color 0.3s ease;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        #predictionResult {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #e9ecef;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+            text-align: center;
+            font-size: 1.1em;
+            font-weight: bold;
+            color: #333;
+        }
+        .error-message {
+            color: red;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Airbnb Price Predictor</h1>
+        <form id="predictionForm">
+            <div class="form-group">
+                <label for="neighbourhood">Neighbourhood:</label>
+                <select id="neighbourhood" name="Neighbourhood " required>
+                    <option value="Manhattan">Manhattan</option>
+                    <option value="Brooklyn">Brooklyn</option>
+                    <option value="Queens">Queens</option>
+                    <option value="Bronx">Bronx</option>
+                    <option value="Staten Island">Staten Island</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="propertyType">Property Type:</label>
+                <select id="propertyType" name="Property Type" required>
+                    <option value="Apartment">Apartment</option>
+                    <option value="House">House</option>
+                    <option value="Condominium">Condominium</option>
+                    <option value="Townhouse">Townhouse</option>
+                    <option value="Loft">Loft</option>
+                    <option value="Other">Other</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="roomType">Room Type:</label>
+                <select id="roomType" name="Room Type" required>
+                    <option value="Entire home/apt">Entire home/apt</option>
+                    <option value="Private room">Private room</option>
+                    <option value="Shared room">Shared room</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="zipcode">Zipcode:</label>
+                <input type="number" id="zipcode" name="Zipcode" placeholder="e.g., 10024" required>
+            </div>
+
+            <div class="form-group">
+                <label for="beds">Number of Beds:</label>
+                <input type="number" id="beds" name="Beds" placeholder="e.g., 2" min="0" required>
+            </div>
+
+            <div class="form-group">
+                <label for="numberOfReviews">Number of Reviews:</label>
+                <input type="number" id="numberOfReviews" name="Number Of Reviews" placeholder="e.g., 50" min="0" required>
+            </div>
+
+            <div class="form-group">
+                <label for="reviewScoresRating">Review Scores Rating (0-100):</label>
+                <input type="number" id="reviewScoresRating" name="Review Scores Rating" placeholder="e.g., 90" min="0" max="100" required>
+            </div>
+
+            <div class="form-group">
+                <label for="reviewScoresRatingBin">Review Scores Rating (Bin 0-100):</label>
+                <input type="number" id="reviewScoresRatingBin" name="Review Scores Rating (bin)" placeholder="e.g., 90" min="0" max="100" required>
+            </div>
+            
+            <button type="submit">Get Prediction</button>
+        </form>
+        
+        <div id="predictionResult"></div>
+        <div class="error-message" id="errorMessage"></div>
+    </div>
+
+    <script>
+        document.getElementById('predictionForm').addEventListener('submit', async function(event) {
+            event.preventDefault();
+
+            const form = event.target;
+            const formData = new FormData(form);
+            const data = {};
+            for (const [key, value] of formData.entries()) {
+                // Convert numerical fields to float if possible, otherwise keep as string
+                if (!isNaN(parseFloat(value)) && isFinite(value) && key !== 'Neighbourhood ' && key !== 'Property Type' && key !== 'Room Type') {
+                    data[key] = parseFloat(value);
+                } else {
+                    data[key] = value;
+                }
+            }
+
+            try {
+                const response = await fetch('/predict', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+                const predictionResult = document.getElementById('predictionResult');
+                const errorMessage = document.getElementById('errorMessage');
+
+                if (response.ok) {
+                    let predictionText = `Predicted Price: $${result.predicted_price}`;
+                    if (result.price_range_lower && result.price_range_upper) {
+                        predictionText += `<br>Price Range: $${result.price_range_lower} - $${result.price_range_upper}`;
+                    }
+                    predictionResult.innerHTML = predictionText;
+                    errorMessage.textContent = '';
+                } else {
+                    errorMessage.textContent = `Error: ${result.error || 'Something went wrong'}`;
+                    predictionResult.textContent = '';
+                }
+            } catch (error) {
+                document.getElementById('errorMessage').textContent = `Network Error: ${error.message}`;
+                document.getElementById('predictionResult').textContent = '';
+            }
+        });
+    </script>
+</body>
+</html>
